@@ -20,37 +20,53 @@ exports.handleMessage = async (req, res) => {
   try {
     const body = req.body;
     
-    console.log('Incoming webhook:', JSON.stringify(body, null, 2));
+    // STEP 1: Sabse pehle Meta ko batao ki request mil gayi (To avoid timeout)
+    res.sendStatus(200);
+
+    // Incoming log check karein
+    // console.log('Incoming webhook:', JSON.stringify(body, null, 2));
 
     if (body.object === 'whatsapp_business_account') {
-      const entry = body.entry[0];
-      const changes = entry.changes[0];
-      const value = changes.value;
+      const entry = body.entry?.[0];
+      const changes = entry?.changes?.[0];
+      const value = changes?.value;
 
-      if (value.messages && value.messages[0]) {
+      // Check: Kya ye actual message hai? (Status update like 'sent/delivered' ignore karein)
+      if (value?.messages && value?.messages?.[0]) {
+        
         const message = value.messages[0];
         const from = message.from;
-        const messageBody = message.text.body;
-        const profileName = value.contacts[0].profile.name;
 
-        console.log(`📩 Message from ${profileName} (${from}): ${messageBody}`);
+        // Check: Kya user ka naam available hai?
+        const profileName = value.contacts?.[0]?.profile?.name || "User";
 
-        // Send reply
-        await sendWhatsAppMessage(from, `Hello ${profileName}! 👋\n\nThanks for your message: "${messageBody}"\n\nThis is an automated response!`);
+        // IMPORTANT: Sirf TEXT messages handle karein
+        if (message.type === 'text') {
+            const messageBody = message.text.body;
+            console.log(`📩 Message from ${profileName} (${from}): ${messageBody}`);
+
+            // Send reply
+            await sendWhatsAppMessage(from, `Hello ${profileName}! 👋\n\nI received: "${messageBody}"`);
+        
+        } else {
+            // Agar image/sticker/audio hai
+            console.log(`📩 Non-text message received type: ${message.type}`);
+            await sendWhatsAppMessage(from, `Sorry ${profileName}, I can only read text messages right now.`);
+        }
       }
     }
 
-    res.sendStatus(200);
   } catch (error) {
-    console.error('❌ Error:', error);
-    res.sendStatus(500);
+    console.error('❌ Error in logic:', error);
+    // Yahan res.sendStatus mat lagana kyunki hum upar already bhej chuke hain
   }
 };
 
 // Send WhatsApp message
 async function sendWhatsAppMessage(to, message) {
   try {
-    const url = `https://graph.facebook.com/v18.0/${process.env.PHONE_NUMBER_ID}/messages`;
+    // API Version v19.0 ya v20.0 use karein (v18 purana ho sakta hai)
+    const url = `https://graph.facebook.com/v19.0/${process.env.PHONE_NUMBER_ID}/messages`;
     
     const response = await axios.post(url, {
       messaging_product: 'whatsapp',
@@ -63,9 +79,10 @@ async function sendWhatsAppMessage(to, message) {
       }
     });
 
-    console.log('✅ Message sent!');
+    console.log('✅ Reply sent successfully!');
     return response.data;
   } catch (error) {
-    console.error('❌ Send error:', error.response?.data || error.message);
+    // Error ki puri details print karein taaki debug kar sakein
+    console.error('❌ Send error details:', error.response?.data || error.message);
   }
 }
