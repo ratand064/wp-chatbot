@@ -29,7 +29,7 @@ app.get('/', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📱 Webhook URL: http://localhost:${PORT}/webhook`);
+  console.log(`📱 Webhook URL: https://wp-chatbot-h6uc.onrender.com/webhook`);
 });
